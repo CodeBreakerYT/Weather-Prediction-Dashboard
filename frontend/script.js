@@ -12,6 +12,15 @@ async function fetchWeather() {
 
     const data = await response.json();
 
+    if (data.cod != 200 || !data.main) {
+        document.getElementById("weather").innerHTML = `
+            <p class="error-message" style="color: #ff4a4a; font-weight: bold; margin-top: 15px;">
+                Error: ${data.message || "Failed to retrieve weather data."}
+            </p>
+        `;
+        return;
+    }
+
     document.getElementById("weather").innerHTML = `
         <h2>${data.name}</h2>
 
