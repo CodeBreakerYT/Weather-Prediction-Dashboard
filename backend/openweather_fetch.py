@@ -9,19 +9,13 @@ from pathlib import Path
 env_path = Path(__file__).resolve().parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-api_key = os.getenv("OPEN_WEATHER_MAP_API_KEY") or os.getenv("OPENWEATHER_MAP_API_KEY")
+api_key = os.getenv("OPEN_WEATHER_MAP_API_KEY")
 
+def get_weather(city):
+    url = (
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?q={city}&appid={api_key}&units=metric"
+    )
 
-
-#OPEN_WEATHER_MAP_API_KEY 
-def get_weather(api_key, city):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}"
-
-    response = requests.get(url).json()
-    return response
-
-
-
-city_name = "Chennai, India"
-r=get_weather(api_key, city_name )
-print(r)
+    response = requests.get(url)
+    return response.json()
