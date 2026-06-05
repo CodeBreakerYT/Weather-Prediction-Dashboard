@@ -101,6 +101,7 @@ def search_cities(query):
         return []
 
 def reverse_geocode(lat, lon):
+    # Try Nominatim first for highly detailed location and address resolution
     headers = {
         "User-Agent": "WeatherPredictionDashboard/2.0 (rishav.weather@example.com)"
     }
@@ -109,29 +110,58 @@ def reverse_geocode(lat, lon):
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            addr = data.get("address", {})
-            # Get neighborhood/suburb/town
-            name = (
-                addr.get("suburb") or 
-                addr.get("neighbourhood") or 
-                addr.get("village") or 
-                addr.get("town") or 
-                addr.get("railway") or 
-                addr.get("city_district") or 
-                addr.get("city") or 
-                addr.get("county") or 
-                data.get("display_name").split(",")[0]
-            )
-            state = addr.get("state", "")
-            country = addr.get("country", "")
-            return {
-                "name": name,
-                "state": state,
-                "country": country,
-                "display_name": data.get("display_name")
-            }
+            if data:
+                addr = data.get("address", {})
+                # Get neighborhood/suburb/town
+                name = (
+                    addr.get("suburb") or 
+                    addr.get("neighbourhood") or 
+                    addr.get("village") or 
+                    addr.get("town") or 
+                    addr.get("railway") or 
+                    addr.get("city_district") or 
+                    addr.get("city") or 
+                    addr.get("county") or 
+                    data.get("display_name").split(",")[0]
+                )
+                state = addr.get("state", "")
+                country = addr.get("country", "")
+                return {
+                    "name": name,
+                    "state": state,
+                    "country": country,
+                    "display_name": data.get("display_name")
+                }
     except Exception as e:
         print("Nominatim reverse geocode error:", e)
+
+    # Fallback to OpenWeatherMap Reverse Geocoding API if Nominatim fails/blocks
+    try:
+        print("Falling back to OpenWeatherMap reverse geocoding...")
+        api_key = os.getenv("OPEN_WEATHER_MAP_API_KEY")
+        owm_url = f"https://api.openweathermap.org/geo/1.0/reverse?lat={lat}&lon={lon}&limit=1&appid={api_key}"
+        owm_response = requests.get(owm_url, timeout=5)
+        if owm_response.status_code == 200:
+            owm_data = owm_response.json()
+            if owm_data and isinstance(owm_data, list) and len(owm_data) > 0:
+                loc = owm_data[0]
+                name = loc.get("name")
+                state = loc.get("state", "")
+                country = loc.get("country", "")
+                display_name = f"{name}"
+                if state:
+                    display_name += f", {state}"
+                if country:
+                    display_name += f", {country}"
+                return {
+                    "name": name,
+                    "state": state,
+                    "country": country,
+                    "display_name": display_name
+                }
+    except Exception as owm_e:
+        print("OpenWeatherMap reverse geocode error:", owm_e)
+        
     return None
 
 

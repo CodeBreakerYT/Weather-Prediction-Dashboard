@@ -110,6 +110,8 @@ body {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    position: relative;
+    z-index: 10005;
 }
 
 .header-left, .header-right {
@@ -226,6 +228,27 @@ body {
     box-shadow: 0 0 10px var(--cyan-glow);
 }
 
+.btn-search-locate {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.btn-search-locate:hover {
+    color: var(--cyan);
+}
+
+.btn-search-locate i {
+    width: 16px;
+    height: 16px;
+}
+
 /* Icon Buttons (Refresh / Bell) */
 .btn-icon {
     background: rgba(255, 255, 255, 0.05);
@@ -279,7 +302,7 @@ body {
     border: 1px solid var(--border-glow);
     border-radius: var(--radius-md);
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    z-index: 1000;
+    z-index: 10010;
     display: none;
     overflow: hidden;
     backdrop-filter: blur(20px);
@@ -378,7 +401,7 @@ body {
     border: 1px solid var(--border-glow);
     border-radius: var(--radius-md);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    z-index: 10000;
+    z-index: 10010;
     display: none;
     max-height: 220px;
     overflow-y: auto;

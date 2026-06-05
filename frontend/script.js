@@ -956,24 +956,80 @@ function updateMapMarker(lat, lon, name, tempCelsius) {
 
 // --- GPS Geolocation Detection ---
 function detectUserLocation() {
-    showNotification("Detecting your current location...", "info");
+    showNotification("Detecting your location via browser GPS...", "info");
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
+                showNotification("Browser GPS location resolved successfully!", "info");
                 fetchWeatherByCoords(lat, lon);
             },
             (error) => {
                 console.warn("Geolocation access failed:", error);
-                showNotification("Could not detect location. Loading Chennai weather.", "info");
-                refreshData();
+                let reason = "Unavailable";
+                if (error.code === 1) reason = "Permission Denied (Check browser location settings)";
+                else if (error.code === 2) reason = "Position Unavailable (Common on Ethernet desktops)";
+                else if (error.code === 3) reason = "Timeout";
+                
+                showNotification(`GPS lookup failed: ${reason}. Falling back to IP geolocation...`, "warning");
+                detectLocationByIP();
             },
-            { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
         );
     } else {
-        refreshData();
+        showNotification("Browser does not support HTML5 Geolocation. Falling back to IP geolocation...", "warning");
+        detectLocationByIP();
     }
+}
+
+function detectLocationByIP() {
+    showNotification("Checking IP-based location (accuracy depends on ISP routing/VPN)...", "info");
+    
+    // Try freeipapi.com first
+    fetch('https://freeipapi.com/api/json')
+        .then(response => {
+            if (!response.ok) throw new Error('freeipapi failed');
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.latitude && data.longitude) {
+                const lat = data.latitude;
+                const lon = data.longitude;
+                const cityName = data.cityName || 'Local Area';
+                const displayAddress = data.regionName ? `${cityName}, ${data.regionName}, ${data.countryName}` : `${cityName}, ${data.countryName}`;
+                showNotification(`Location resolved by IP: ${cityName} (approximate)`, "info");
+                fetchWeatherByCoords(lat, lon, cityName, displayAddress);
+            } else {
+                throw new Error('Invalid IP data structure');
+            }
+        })
+        .catch(err => {
+            console.warn("IP Geolocation via freeipapi failed, trying backup:", err);
+            // Backup with ipapi.co
+            fetch('https://ipapi.co/json/')
+                .then(response => {
+                    if (!response.ok) throw new Error('ipapi.co failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.latitude && data.longitude) {
+                        const lat = data.latitude;
+                        const lon = data.longitude;
+                        const cityName = data.city || 'Local Area';
+                        const displayAddress = data.region ? `${cityName}, ${data.region}, ${data.country_name}` : `${cityName}, ${data.country_name}`;
+                        showNotification(`Location resolved by IP: ${cityName} (approximate)`, "info");
+                        fetchWeatherByCoords(lat, lon, cityName, displayAddress);
+                    } else {
+                        throw new Error('Invalid backup IP data structure');
+                    }
+                })
+                .catch(backupErr => {
+                    console.error("All IP Geolocation methods failed:", backupErr);
+                    showNotification("Could not detect location. Loading default city (Chennai).", "info");
+                    refreshData();
+                });
+        });
 }
 
 // --- Map Custom Themes and Fullscreen ---
