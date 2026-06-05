@@ -1,29 +1,467 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Weather Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Explorer - Gamified Prediction Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Leaflet.js Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Core CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Background Ambient Effect -->
+    <div id="ambient-overlay" class="ambient-overlay"></div>
 
-    <div class="container">
-        <h1>Weather Dashboard</h1>
+    <div class="dashboard-wrapper">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-area">
+                    <span class="logo-icon">⭐</span>
+                    <h1 class="logo-text">Weather Explorer</h1>
+                </div>
+                <!-- Popular Cities Quick Select -->
+                <div class="quick-cities">
+                    <button class="city-tag active" onclick="searchPopularCity('Chennai')">Chennai</button>
+                    <button class="city-tag" onclick="searchPopularCity('London')">London</button>
+                    <button class="city-tag" onclick="searchPopularCity('New York')">New York</button>
+                    <button class="city-tag" onclick="searchPopularCity('Tokyo')">Tokyo</button>
+                    <button class="city-tag" onclick="searchPopularCity('Paris')">Paris</button>
+                    <button class="city-tag" onclick="searchPopularCity('Sydney')">Sydney</button>
+                </div>
+            </div>
 
-        <input
-            type="text"
-            id="city"
-            placeholder="Enter City"
-            value="Chennai"
-        >
+            <div class="header-right">
+                <!-- Search Box with Recommendations -->
+                <div class="search-wrapper">
+                    <div class="search-container">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="city-input" placeholder="Search city name..." onkeydown="handleSearchKey(event)" autocomplete="off">
+                        <button onclick="detectUserLocation()" class="btn-search-locate" title="Use Current Location">
+                            <i data-lucide="locate"></i>
+                        </button>
+                        <button onclick="triggerSearch()" class="btn-search">Search</button>
+                    </div>
+                    <div class="search-suggestions-box" id="search-suggestions"></div>
+                </div>
 
-        <button onclick="fetchWeather()">
-            Get Weather
-        </button>
+                <!-- Refresh Button -->
+                <button onclick="refreshData()" class="btn-icon" id="btn-refresh" title="Refresh weather data">
+                    <i data-lucide="refresh-cw" id="icon-refresh"></i>
+                </button>
 
-        <div id="weather"></div>
+                <!-- Notifications Tray -->
+                <div class="notification-container">
+                    <button onclick="toggleNotifications()" class="btn-icon notification-bell" id="btn-bell" title="Notifications">
+                        <i data-lucide="bell"></i>
+                        <span class="badge" id="notification-badge"></span>
+                    </button>
+                    <div class="notification-dropdown" id="notification-dropdown">
+                        <div class="dropdown-header">
+                            <h3>Alerts & Warnings</h3>
+                            <button onclick="clearNotifications()" class="btn-text">Clear All</button>
+                        </div>
+                        <div class="dropdown-content" id="notification-list">
+                            <div class="empty-notifications">No active warnings for today.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT CONTAINER -->
+        <main class="dashboard-main">
+            <!-- LEFT GRID: HERO & ANIMATION ORB -->
+            <section class="main-left">
+                <!-- HERO CARD -->
+                <div class="card glass-card hero-card" id="hero-card">
+                    <div class="hero-bg-gradient" id="hero-gradient"></div>
+                    <div class="hero-content">
+                        <div class="hero-header">
+                            <div>
+                                <h2 class="city-name" id="city-display">Loading City...</h2>
+                                <p class="precise-address" id="address-display" style="display: none;"></p>
+                                <p class="current-date" id="date-display">Date/Time Details</p>
+                            </div>
+                            <div class="temp-unit-toggle">
+                                <button id="unit-c" class="unit-btn active" onclick="setUnit('C')">°C</button>
+                                <button id="unit-f" class="unit-btn" onclick="setUnit('F')">°F</button>
+                            </div>
+                        </div>
+
+                        <div class="hero-body">
+                            <div class="temp-wrapper">
+                                <span class="temp-value" id="temp-display">--°</span>
+                                <div class="temp-meta">
+                                    <p class="weather-desc" id="condition-display">--</p>
+                                    <p class="feels-like">Feels like <span id="feels-like-display" class="highlight-text">--°</span></p>
+                                </div>
+                            </div>
+                            
+                            <div class="hero-visual">
+                                <div class="glow-orb" id="orb-visual"></div>
+                                <div class="weather-icon-badge" id="weather-badge-container">
+                                    <!-- Dynamic SVG icon inserted here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sun Phase Info -->
+                        <div class="sun-phases">
+                            <div class="sun-phase-item sunrise">
+                                <i data-lucide="sunrise" class="icon-sunrise"></i>
+                                <div>
+                                    <p class="label">Sunrise</p>
+                                    <p class="value" id="sunrise-display">--:--</p>
+                                </div>
+                            </div>
+                            <div class="sun-phase-item sunset">
+                                <i data-lucide="sunset" class="icon-sunset"></i>
+                                <div>
+                                    <p class="label">Sunset</p>
+                                    <p class="value" id="sunset-display">--:--</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DYNAMIC WEATHER ANIMATION STAGE -->
+                <div class="card glass-card animation-card" id="animation-card">
+                    <div class="card-header">
+                        <i data-lucide="sparkles" class="header-icon"></i>
+                        <h3>Interactive Atmosphere Simulation</h3>
+                    </div>
+                    <div class="stage-viewport" id="animation-viewport">
+                        <!-- Dynamic SVG skies and particles are generated here -->
+                        <div class="sky-background" id="sky-back"></div>
+                        <div class="sun-element" id="sun-element"></div>
+                        <div class="cloud-layer" id="cloud-layer"></div>
+                        <div class="weather-particles" id="weather-particles"></div>
+                        
+                        <div class="stage-overlay">
+                            <div class="overlay-temp" id="stage-temp-overlay">--°</div>
+                            <div class="overlay-info">
+                                <p class="overlay-condition" id="stage-cond-overlay">--</p>
+                                <p class="overlay-sub"><span id="stage-humidity-overlay">--</span>% Humidity</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CITY COMPARISON DRAG-IN -->
+                <div class="card glass-card comparison-card">
+                    <div class="card-header">
+                        <i data-lucide="git-compare" class="header-icon"></i>
+                        <h3>Dual-City Comparison</h3>
+                    </div>
+                    <div class="comparison-grid">
+                        <div class="comparison-input-box">
+                            <input type="text" id="compare-city-input" placeholder="Enter second city...">
+                            <button onclick="compareCities()" class="btn-secondary">Compare</button>
+                        </div>
+                        
+                        <div class="comparison-table" id="comparison-table">
+                            <div class="comparison-row header-row">
+                                <div>Metric</div>
+                                <div id="comp-city-primary" class="primary-city-col">Primary City</div>
+                                <div id="comp-city-secondary" class="secondary-city-col">Secondary City</div>
+                            </div>
+                            <div class="comparison-row">
+                                <div>Temp</div>
+                                <div id="comp-val-temp1">--</div>
+                                <div id="comp-val-temp2">--</div>
+                            </div>
+                            <div class="comparison-row">
+                                <div>Humidity</div>
+                                <div id="comp-val-humid1">--</div>
+                                <div id="comp-val-humid2">--</div>
+                            </div>
+                            <div class="comparison-row">
+                                <div>Wind</div>
+                                <div id="comp-val-wind1">--</div>
+                                <div id="comp-val-wind2">--</div>
+                            </div>
+                            <div class="comparison-row">
+                                <div>Overall index</div>
+                                <div id="comp-val-index1" class="index-score">--</div>
+                                <div id="comp-val-index2" class="index-score">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT GRID: STATS, MAP, FORECAST, RPG -->
+            <section class="main-right">
+                <!-- INTERACTIVE METRICS GRID -->
+                <div class="card glass-card stats-card">
+                    <div class="card-header">
+                        <i data-lucide="sliders" class="header-icon"></i>
+                        <h3>Atmospheric Diagnostics</h3>
+                        <span class="click-instruction">Click card to expand detailed analytics</span>
+                    </div>
+
+                    <div class="interactive-grid" id="stats-grid">
+                        <!-- Humidity Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('humidity')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper humidity">
+                                    <i data-lucide="droplets"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Humidity</p>
+                                    <p class="value" id="stat-val-humidity">--%</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-humidity">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-humidity">
+                                <div class="status-badge" id="badge-humidity">Comfortable</div>
+                                <div class="details-cols">
+                                    <div class="detail-box">
+                                        <p class="label">Dew Point</p>
+                                        <p class="value" id="detail-val-dew">--°</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <p class="label">Comfort Status</p>
+                                        <p class="value" id="detail-val-comfort">Optimal</p>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    The air contains <span id="detail-humid-desc">--%</span> of the maximum moisture it can hold at this temperature.
+                                </div>
+                                <!-- Micro-Chart inside Humidity -->
+                                <div class="micro-chart-container">
+                                    <canvas id="humidity-micro-chart" height="120"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Wind Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('wind')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper wind">
+                                    <i data-lucide="wind"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Wind Speed</p>
+                                    <p class="value" id="stat-val-wind">-- m/s</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-wind">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-wind">
+                                <div class="status-badge" id="badge-wind">Calm</div>
+                                <div class="wind-diagnostics">
+                                    <div class="compass-wrapper">
+                                        <div class="compass-ring">
+                                            <div class="compass-arrow" id="compass-arrow" style="transform: rotate(0deg)"></div>
+                                            <span class="dir-n">N</span>
+                                            <span class="dir-s">S</span>
+                                            <span class="dir-e">E</span>
+                                            <span class="dir-w">W</span>
+                                        </div>
+                                    </div>
+                                    <div class="wind-info-cols">
+                                        <div class="detail-box">
+                                            <p class="label">Wind Gusts</p>
+                                            <p class="value" id="detail-val-gust">-- m/s</p>
+                                        </div>
+                                        <div class="detail-box">
+                                            <p class="label">Direction</p>
+                                            <p class="value" id="detail-val-deg">--° (--)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    Wind is blowing from the <span id="detail-wind-dir">--</span> direction at <span id="detail-wind-speed">--</span> m/s.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visibility Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('visibility')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper visibility">
+                                    <i data-lucide="eye"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Visibility</p>
+                                    <p class="value" id="stat-val-visibility">-- km</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-visibility">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-visibility">
+                                <div class="status-badge" id="badge-visibility">Clear</div>
+                                <div class="details-cols">
+                                    <div class="detail-box">
+                                        <p class="label">Clarity Status</p>
+                                        <p class="value" id="detail-val-clarity">Excellent</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <p class="label">Fog Warning</p>
+                                        <p class="value" id="detail-val-fog">None</p>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    Maximum distance at which objects can be clearly identified is <span id="detail-vis-val">--</span> km.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Atmospheric Pressure Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('pressure')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper pressure">
+                                    <i data-lucide="gauge"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Pressure</p>
+                                    <p class="value" id="stat-val-pressure">-- mb</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-pressure">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-pressure">
+                                <div class="status-badge" id="badge-pressure">Normal</div>
+                                <div class="details-cols">
+                                    <div class="detail-box">
+                                        <p class="label">Pressure Trend</p>
+                                        <p class="value" id="detail-val-trend">Stable</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <p class="label">Stability rating</p>
+                                        <p class="value" id="detail-val-stability">Optimal</p>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    Atmospheric weight pressure is at <span id="detail-press-val">--</span> millibars. Standard sea-level weight is 1013 mb.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cloud Cover Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('clouds')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper clouds">
+                                    <i data-lucide="cloud"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Cloud Cover</p>
+                                    <p class="value" id="stat-val-clouds">--%</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-clouds">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-clouds">
+                                <div class="status-badge" id="badge-clouds">Overcast</div>
+                                <div class="details-cols">
+                                    <div class="detail-box">
+                                        <p class="label">Sky Coverage</p>
+                                        <p class="value" id="detail-val-sky">Dense</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <p class="label">Stargazing suitability</p>
+                                        <p class="value" id="detail-val-stars">Poor</p>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    About <span id="detail-cloud-val">--%</span> of the celestial sky canopy is obscured by clouds.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- UV / Feels Like Card -->
+                        <div class="stat-item clickable" onclick="toggleStatExpand('feelslike')">
+                            <div class="stat-summary">
+                                <div class="stat-icon-wrapper feelslike">
+                                    <i data-lucide="zap"></i>
+                                </div>
+                                <div class="stat-info-short">
+                                    <p class="label">Feels Like</p>
+                                    <p class="value" id="stat-val-feelslike">--°</p>
+                                </div>
+                                <div class="stat-arrow" id="arrow-feelslike">▼</div>
+                            </div>
+                            <div class="stat-details" id="details-feelslike">
+                                <div class="status-badge" id="badge-feelslike">Neutral</div>
+                                <div class="details-cols">
+                                    <div class="detail-box">
+                                        <p class="label">Actual Temp</p>
+                                        <p class="value" id="detail-val-actual">--°</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <p class="label">Variance</p>
+                                        <p class="value" id="detail-val-variance">--°</p>
+                                    </div>
+                                </div>
+                                <div class="detail-explanation">
+                                    Combination of humidity, temperature, and wind chill creates a perceived heat indices index of <span id="detail-feel-val">--°</span>.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- INTERACTIVE LEAFLET WEATHER MAP -->
+                <div class="card glass-card map-card" id="map-card-container">
+                    <div class="card-header">
+                        <i data-lucide="map" class="header-icon"></i>
+                        <h3>Regional Weather Map</h3>
+                        <div class="map-controls">
+                            <button onclick="detectUserLocation()" class="btn-map-control" id="btn-map-locate" title="Recenter to My Location">
+                                <i data-lucide="locate"></i>
+                            </button>
+                            <button onclick="toggleMapTheme()" class="btn-map-control" id="btn-map-theme" title="Switch to Light Theme">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                            <button onclick="toggleMapFullscreen()" class="btn-map-control" id="btn-map-expand" title="Expand Map">
+                                <i data-lucide="maximize-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="map-wrapper">
+                        <div id="weather-map"></div>
+                        <button onclick="detectUserLocation()" class="floating-map-locate-btn" title="Center map on my location">
+                            <i data-lucide="locate"></i>
+                        </button>
+                    </div>
+                    <div class="map-footer" id="map-footer-coords">
+                        GPS Coordinates: --, --
+                    </div>
+                </div>
+
+                <!-- FORECAST: 5-DAY HORIZONS -->
+                <div class="card glass-card forecast-card">
+                    <div class="card-header">
+                        <i data-lucide="calendar" class="header-icon"></i>
+                        <h3>5-Day Forecast</h3>
+                    </div>
+                    <div class="forecast-list" id="forecast-container">
+                        <!-- Dynamic forecast days generated here -->
+                        <div class="forecast-skeleton">Loading Forecast Data...</div>
+                    </div>
+                </div>
+
+                <!-- COMPREHENSIVE TREND ANALYTICS -->
+                <div class="card glass-card analytics-card">
+                    <div class="card-header">
+                        <i data-lucide="trending-up" class="header-icon"></i>
+                        <h3>Atmospheric Trends (48 Hours)</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="weather-trends-chart" height="240"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
-
+    <!-- Leaflet JS Library -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Core logic script -->
     <script src="script.js"></script>
-
 </body>
 </html>
