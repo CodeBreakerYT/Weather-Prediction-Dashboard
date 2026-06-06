@@ -6,7 +6,10 @@ sys.path.append(str(Path(__file__).resolve().parent))
 
 from flask import Flask, jsonify
 from flask_cors import CORS
-from openweather_fetch import get_weather, get_forecast, get_weather_by_coords, get_forecast_by_coords, search_cities, reverse_geocode
+try:
+    from openweather_fetch import get_weather, get_forecast, get_weather_by_coords, get_forecast_by_coords, search_cities, reverse_geocode
+except ModuleNotFoundError:
+    from backend.openweather_fetch import get_weather, get_forecast, get_weather_by_coords, get_forecast_by_coords, search_cities, reverse_geocode
 
 backend_dir = Path(__file__).resolve().parent
 frontend_dir = backend_dir.parent / "frontend"

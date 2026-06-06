@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Explorer - Gamified Prediction Dashboard</title>
+    <title>Weather Prediction Dashboard</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
     <!-- Leaflet.js Map CSS -->
@@ -21,7 +21,7 @@
             <div class="header-left">
                 <div class="logo-area">
                     <span class="logo-icon">⭐</span>
-                    <h1 class="logo-text">Weather Explorer</h1>
+                    <h1 class="logo-text">Weather Prediction Dashboard</h1>
                 </div>
                 <!-- Popular Cities Quick Select -->
                 <div class="quick-cities">
@@ -445,8 +445,15 @@
                 <!-- COMPREHENSIVE TREND ANALYTICS -->
                 <div class="card glass-card analytics-card">
                     <div class="card-header">
-                        <i data-lucide="trending-up" class="header-icon"></i>
-                        <h3>Atmospheric Trends (48 Hours)</h3>
+                        <div class="header-left-group">
+                            <i data-lucide="trending-up" class="header-icon"></i>
+                            <h3>Atmospheric Trends (48 Hours)</h3>
+                        </div>
+                        <div class="chart-tabs-container">
+                            <button id="tab-temp-humid" class="chart-tab active" onclick="switchChartTab('temp-humid')" title="View Temperature & Humidity">Temp & Humidity</button>
+                            <button id="tab-wind-precip" class="chart-tab" onclick="switchChartTab('wind-precip')" title="View Wind & Precipitation">Wind & Precip</button>
+                            <button id="tab-press-clouds" class="chart-tab" onclick="switchChartTab('press-clouds')" title="View Pressure & Clouds">Pressure & Clouds</button>
+                        </div>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="weather-trends-chart" height="240"></canvas>

@@ -12,6 +12,7 @@ let map = null;
 let mapMarker = null;
 let mainTrendsChart = null;
 let humidityMicroChart = null;
+let currentChartTab = 'temp-humid';
 
 // Search Recommendations State
 let searchSuggestionsList = [];
@@ -263,7 +264,28 @@ function updateDashboard() {
     // 1. Update text displays
     const cityName = currentWeatherData.custom_name || currentWeatherData.name;
     const country = currentWeatherData.sys.country || '';
-    document.getElementById('city-display').innerText = `${cityName}, ${country}`;
+    
+    let locationText = cityName;
+    if (country && !cityName.toLowerCase().includes(country.toLowerCase()) && !cityName.includes(',')) {
+        const countryNames = {
+            'IN': 'India',
+            'US': 'United States',
+            'GB': 'United Kingdom',
+            'JP': 'Japan',
+            'FR': 'France',
+            'AU': 'Australia',
+            'DE': 'Germany',
+            'CA': 'Canada',
+            'CN': 'China',
+            'RU': 'Russia',
+            'BR': 'Brazil',
+            'ZA': 'South Africa',
+            'KR': 'South Korea'
+        };
+        const countryName = countryNames[country.toUpperCase()] || country;
+        locationText = `${cityName}, ${countryName}`;
+    }
+    document.getElementById('city-display').innerText = locationText;
     
     const addressEl = document.getElementById('address-display');
     if (addressEl) {
@@ -593,15 +615,18 @@ function updateInteractiveStats() {
     document.getElementById('detail-cloud-val').innerText = clouds.all;
 
     // 6. Feels Like Details
-    const variance = Math.round(main.feels_like - main.temp);
-    const feelBadge = variance > 1 ? { label: 'Humid Heat', class: 'pink' } :
-                      variance < -1 ? { label: 'Wind Chill', class: 'cyan' } :
-                                      { label: 'Neutral', class: 'indigo' };
+    const actualTempConverted = convertTemp(main.temp);
+    const feelsTempConverted = convertTemp(main.feels_like);
+    const varianceConverted = feelsTempConverted - actualTempConverted;
+    
+    const feelBadge = varianceConverted > 1 ? { label: 'Humid Heat', class: 'pink' } :
+                      varianceConverted < -1 ? { label: 'Wind Chill', class: 'cyan' } :
+                                               { label: 'Neutral', class: 'indigo' };
     document.getElementById('badge-feelslike').innerText = feelBadge.label;
     document.getElementById('badge-feelslike').className = `status-badge ${feelBadge.class}`;
-    document.getElementById('detail-val-actual').innerText = `${convertTemp(Math.round(main.temp))}°`;
-    document.getElementById('detail-val-variance').innerText = `${variance > 0 ? '+' : ''}${convertTemp(variance)}°`;
-    document.getElementById('detail-feel-val').innerText = `${convertTemp(Math.round(main.feels_like))}°`;
+    document.getElementById('detail-val-actual').innerText = `${actualTempConverted}°`;
+    document.getElementById('detail-val-variance').innerText = `${varianceConverted > 0 ? '+' : ''}${varianceConverted}°`;
+    document.getElementById('detail-feel-val').innerText = `${feelsTempConverted}°`;
 
     // Redraw micro chart if currently expanded
     if (expandedStat === 'humidity') {
@@ -825,11 +850,55 @@ function updateAnalyticsChart() {
     
     if (!currentForecastData || !currentForecastData.list) return;
 
-    // Fetch 12 readings (covers 36 hours of forecasts)
-    const points = currentForecastData.list.slice(0, 12);
+    // Fetch 16 readings (covers full 48 hours of forecasts)
+    const points = currentForecastData.list.slice(0, 16);
     const labels = points.map(p => formatTimestamp(p.dt, 'time-short'));
-    const tempDataset = points.map(p => convertTemp(Math.round(p.main.temp)));
-    const humidDataset = points.map(p => p.main.humidity);
+    
+    let dataset1 = [];
+    let dataset2 = [];
+    let label1 = '';
+    let label2 = '';
+    let color1 = '';
+    let color2 = '';
+    let yLeftTitle = '';
+    let yRightTitle = '';
+    let yRightMin = 0;
+    let yRightMax = 100;
+
+    if (currentChartTab === 'temp-humid') {
+        dataset1 = points.map(p => convertTemp(Math.round(p.main.temp)));
+        dataset2 = points.map(p => p.main.humidity);
+        label1 = `Temperature (${tempUnit === 'C' ? '°C' : '°F'})`;
+        label2 = 'Humidity (%)';
+        color1 = '#00d9ff'; // Cyan
+        color2 = '#6366f1'; // Indigo
+        yLeftTitle = `Temperature (${tempUnit === 'C' ? '°C' : '°F'})`;
+        yRightTitle = 'Humidity (%)';
+        yRightMin = 0;
+        yRightMax = 100;
+    } else if (currentChartTab === 'wind-precip') {
+        dataset1 = points.map(p => Math.round(p.wind.speed));
+        dataset2 = points.map(p => Math.round((p.pop || 0) * 100));
+        label1 = 'Wind Speed (m/s)';
+        label2 = 'Precipitation Chance (%)';
+        color1 = '#fbbf24'; // Yellow
+        color2 = '#ff006e'; // Pink
+        yLeftTitle = 'Wind Speed (m/s)';
+        yRightTitle = 'Precipitation Chance (%)';
+        yRightMin = 0;
+        yRightMax = 100;
+    } else if (currentChartTab === 'press-clouds') {
+        dataset1 = points.map(p => p.main.pressure);
+        dataset2 = points.map(p => p.clouds.all);
+        label1 = 'Pressure (mb)';
+        label2 = 'Cloud Cover (%)';
+        color1 = '#8b5cf6'; // Purple
+        color2 = '#00d9ff'; // Cyan
+        yLeftTitle = 'Atmospheric Pressure (mb)';
+        yRightTitle = 'Cloud Cover (%)';
+        yRightMin = 0;
+        yRightMax = 100;
+    }
 
     mainTrendsChart = new Chart(ctx, {
         type: 'line',
@@ -837,28 +906,28 @@ function updateAnalyticsChart() {
             labels: labels,
             datasets: [
                 {
-                    label: `Temperature (${tempUnit === 'C' ? '°C' : '°F'})`,
-                    data: tempDataset,
-                    borderColor: '#00d9ff',
-                    backgroundColor: 'rgba(0, 217, 255, 0.05)',
+                    label: label1,
+                    data: dataset1,
+                    borderColor: color1,
+                    backgroundColor: `${color1}0c`, // very transparent color background
                     borderWidth: 3,
                     tension: 0.3,
-                    yAxisID: 'y-temp',
+                    yAxisID: 'y-left',
                     fill: false,
                     pointRadius: 4,
-                    pointBackgroundColor: '#00d9ff'
+                    pointBackgroundColor: color1
                 },
                 {
-                    label: 'Humidity (%)',
-                    data: humidDataset,
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                    label: label2,
+                    data: dataset2,
+                    borderColor: color2,
+                    backgroundColor: `${color2}0c`,
                     borderWidth: 2,
                     tension: 0.3,
-                    yAxisID: 'y-humid',
+                    yAxisID: 'y-right',
                     fill: false,
                     pointRadius: 3,
-                    pointBackgroundColor: '#6366f1'
+                    pointBackgroundColor: color2
                 }
             ]
         },
@@ -879,26 +948,61 @@ function updateAnalyticsChart() {
             },
             scales: {
                 x: {
+                    title: {
+                        display: true,
+                        text: 'Time (Forecast Period)',
+                        color: '#8b94b8',
+                        font: { family: 'Outfit', size: 11, weight: 'bold' }
+                    },
                     grid: { color: 'rgba(255, 255, 255, 0.03)' },
                     ticks: { color: '#8b94b8', font: { family: 'Outfit' } }
                 },
-                'y-temp': {
+                'y-left': {
                     type: 'linear',
                     position: 'left',
+                    title: {
+                        display: true,
+                        text: yLeftTitle,
+                        color: color1,
+                        font: { family: 'Outfit', size: 11, weight: 'bold' }
+                    },
                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#00d9ff', font: { family: 'Outfit' } }
+                    ticks: { color: color1, font: { family: 'Outfit' } }
                 },
-                'y-humid': {
+                'y-right': {
                     type: 'linear',
                     position: 'right',
+                    title: {
+                        display: true,
+                        text: yRightTitle,
+                        color: color2,
+                        font: { family: 'Outfit', size: 11, weight: 'bold' }
+                    },
                     grid: { drawOnChartArea: false },
-                    ticks: { color: '#6366f1', font: { family: 'Outfit' } },
-                    min: 0,
-                    max: 100
+                    ticks: { color: color2, font: { family: 'Outfit' } },
+                    min: yRightMin,
+                    max: yRightMax
                 }
             }
         }
     });
+}
+
+function switchChartTab(tabId) {
+    if (currentChartTab === tabId) return;
+    currentChartTab = tabId;
+    
+    // Update active class on buttons
+    const tabs = document.querySelectorAll('.chart-tab');
+    tabs.forEach(tab => {
+        if (tab.id === `tab-${tabId}`) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+    
+    updateAnalyticsChart();
 }
 
 // --- Interactive Leaflet Map ---
@@ -1200,7 +1304,7 @@ let activeNotifications = [];
 
 function initNotifications() {
     activeNotifications = [
-        { id: 1, type: 'info', text: 'Welcome to Weather Explorer! Ready to analyze atmospheric diagnostics?', time: 'Just now' }
+        { id: 1, type: 'info', text: 'Welcome to Weather Prediction Dashboard! Ready to analyze atmospheric diagnostics?', time: 'Just now' }
     ];
     renderNotifications();
 }

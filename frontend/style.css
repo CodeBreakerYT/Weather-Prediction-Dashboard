@@ -476,6 +476,7 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 10px;
 }
 
@@ -1405,6 +1406,27 @@ body {
     margin-top: 2px;
 }
 
+.leaflet-popup-content-wrapper {
+    background: rgba(12, 16, 42, 0.9) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-glow) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-tip {
+    background: rgba(12, 16, 42, 0.9) !important;
+    border: 1px solid var(--border-glow) !important;
+}
+
+.leaflet-popup-close-button {
+    color: var(--text-secondary) !important;
+}
+
+.leaflet-popup-close-button:hover {
+    color: var(--cyan) !important;
+}
+
 /* ==========================================================================
    5-DAY FORECAST SECTION
    ========================================================================== */
@@ -1525,6 +1547,46 @@ body {
 .chart-wrapper {
     padding: 20px;
     background: rgba(0,0,0,0.15);
+}
+
+.header-left-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chart-tabs-container {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 3px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chart-tab {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: var(--transition);
+}
+
+.chart-tab:hover {
+    color: var(--cyan);
+    background: rgba(0, 217, 255, 0.05);
+}
+
+.chart-tab.active {
+    color: var(--bg-dark);
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan-glow);
 }
 
 /* ==========================================================================
