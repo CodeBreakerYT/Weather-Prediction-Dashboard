@@ -24,10 +24,8 @@ let rainSplashInterval = null;
 let stormLightningInterval = null;
 let wispInterval = null;
 
-// API Base detection (compatible with Vercel and local environment)
-const apiBase = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? (window.location.port === "3000" || window.location.port === "5000" ? "" : "http://127.0.0.1:5000")
-    : "";
+// --- OpenWeatherMap Configuration ---
+const OPENWEATHER_API_KEY = "ENTER_YOUR_API_KEY_HERE";
 
 // --- Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
@@ -45,8 +43,14 @@ async function refreshData() {
 async function fetchWeatherData(city) {
     showLoadingState(true);
     try {
+        if (!OPENWEATHER_API_KEY || OPENWEATHER_API_KEY === "ENTER_YOUR_API_KEY_HERE") {
+            showAPIError("Please set your OPENWEATHER_API_KEY in script.js");
+            showLoadingState(false);
+            return;
+        }
+
         // Fetch Current Weather
-        const weatherRes = await fetch(`${apiBase}/weather/${city}`);
+        const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OPENWEATHER_API_KEY}&units=metric`);
         const weatherData = await weatherRes.json();
         
         if (weatherData.cod != 200 || !weatherData.main) {
@@ -56,18 +60,21 @@ async function fetchWeatherData(city) {
         }
 
         // Fetch Forecast
-        const forecastRes = await fetch(`${apiBase}/weather/forecast/${city}`);
+        const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${OPENWEATHER_API_KEY}&units=metric`);
         const forecastData = await forecastRes.json();
 
         // Reverse geocode coordinate to resolve neighborhood/suburb detail
         try {
             const lat = weatherData.coord.lat;
             const lon = weatherData.coord.lon;
-            const reverseRes = await fetch(`${apiBase}/weather/reverse/${lat}/${lon}`);
+            const reverseRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`, {
+                headers: { "User-Agent": "WeatherPredictionDashboard/2.0" }
+            });
             if (reverseRes.ok) {
                 const reverseData = await reverseRes.json();
-                if (reverseData && reverseData.name) {
-                    weatherData.custom_name = reverseData.name;
+                if (reverseData && reverseData.display_name) {
+                    const addr = reverseData.address || {};
+                    weatherData.custom_name = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || reverseData.name;
                     weatherData.display_address = reverseData.display_name;
                 }
             }
@@ -82,7 +89,7 @@ async function fetchWeatherData(city) {
         updateDashboard();
     } catch (err) {
         console.error("API error fetching city weather:", err);
-        showAPIError("Could not connect to Flask API server.");
+        showAPIError("Could not connect to OpenWeather API.");
     } finally {
         showLoadingState(false);
     }
@@ -91,7 +98,13 @@ async function fetchWeatherData(city) {
 async function fetchWeatherByCoords(lat, lon, customName = null, displayAddress = null) {
     showLoadingState(true);
     try {
-        const weatherRes = await fetch(`${apiBase}/weather/coords/current/${lat}/${lon}`);
+        if (!OPENWEATHER_API_KEY || OPENWEATHER_API_KEY === "ENTER_YOUR_API_KEY_HERE") {
+            showAPIError("Please set your OPENWEATHER_API_KEY in script.js");
+            showLoadingState(false);
+            return;
+        }
+
+        const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`);
         const weatherData = await weatherRes.json();
 
         if (weatherData.cod != 200 || !weatherData.main) {
@@ -100,7 +113,7 @@ async function fetchWeatherByCoords(lat, lon, customName = null, displayAddress 
             return;
         }
 
-        const forecastRes = await fetch(`${apiBase}/weather/coords/forecast/${lat}/${lon}`);
+        const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`);
         const forecastData = await forecastRes.json();
 
         // Use passed geocoding info or fetch from backend reverse geocode endpoint
@@ -109,11 +122,14 @@ async function fetchWeatherByCoords(lat, lon, customName = null, displayAddress 
             weatherData.display_address = displayAddress;
         } else {
             try {
-                const reverseRes = await fetch(`${apiBase}/weather/reverse/${lat}/${lon}`);
+                const reverseRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`, {
+                    headers: { "User-Agent": "WeatherPredictionDashboard/2.0" }
+                });
                 if (reverseRes.ok) {
                     const reverseData = await reverseRes.json();
-                    if (reverseData && reverseData.name) {
-                        weatherData.custom_name = reverseData.name;
+                    if (reverseData && reverseData.display_name) {
+                        const addr = reverseData.address || {};
+                        weatherData.custom_name = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || reverseData.name;
                         weatherData.display_address = reverseData.display_name;
                     }
                 }
@@ -129,7 +145,7 @@ async function fetchWeatherByCoords(lat, lon, customName = null, displayAddress 
         updateDashboard();
     } catch (err) {
         console.error("API error fetching coord weather:", err);
-        showAPIError("Could not connect to Flask API server.");
+        showAPIError("Could not connect to OpenWeather API.");
     } finally {
         showLoadingState(false);
     }
@@ -189,10 +205,23 @@ function setupAutocomplete() {
 
 async function fetchSearchRecommendations(query) {
     try {
-        const res = await fetch(`${apiBase}/weather/search/${encodeURIComponent(query)}`);
-        const data = await res.json();
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`, {
+            headers: { "User-Agent": "WeatherPredictionDashboard/2.0" }
+        });
+        const results = await res.json();
         
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(results) && results.length > 0) {
+            const data = results.map(item => {
+                const addr = item.address || {};
+                return {
+                    name: addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city || item.display_name.split(",")[0],
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                    state: addr.state || "",
+                    country: addr.country || "",
+                    display_name: item.display_name
+                };
+            });
             searchSuggestionsList = data;
             renderSuggestions(data);
         } else {
